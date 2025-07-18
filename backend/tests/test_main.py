@@ -17,6 +17,6 @@ def test_health_check():
 
 @pytest.mark.asyncio
 async def test_async_client():
-    async with AsyncClient(app=app, base_url="http://test") as ac:
+    async with AsyncClient(base_url="http://test") as ac:
         response = await ac.get("/")
     assert response.status_code == 200

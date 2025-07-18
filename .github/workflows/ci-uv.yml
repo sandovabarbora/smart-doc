@@ -1,0 +1,104 @@
+name: CI/CD Pipeline with UV
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+jobs:
+  test-backend:
+    name: Backend Tests with UV
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install UV
+      uses: astral-sh/setup-uv@v1
+      with:
+        version: "latest"
+    
+    - name: Set up Python
+      run: uv python install 3.11
+    
+    - name: Install dependencies
+      run: |
+        cd backend
+        uv venv --python 3.11
+        source .venv/bin/activate
+        uv pip install -e ".[dev]"
+    
+    - name: Lint with flake8
+      run: |
+        cd backend
+        source .venv/bin/activate
+        flake8 app/ --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 app/ --count --exit-zero --max-complexity=10 --max-line-length=100 --statistics
+    
+    - name: Format check with black
+      run: |
+        cd backend
+        source .venv/bin/activate
+        black --check app/ tests/
+    
+    - name: Type check with mypy
+      run: |
+        cd backend
+        source .venv/bin/activate
+        mypy app/ --ignore-missing-imports
+    
+    - name: Test with pytest
+      env:
+        DATABASE_URL: sqlite:///./test.db
+        TESTING: true
+      run: |
+        cd backend
+        source .venv/bin/activate
+        pytest --cov=app --cov-report=xml --cov-fail-under=85 -v
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./backend/coverage.xml
+        flags: backend
+        name: backend-coverage
+
+  test-frontend:
+    name: Frontend Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Install dependencies
+      run: |
+        cd frontend
+        npm ci
+    
+    - name: Type check
+      run: |
+        cd frontend
+        npm run type-check
+    
+    - name: Test with Jest
+      run: |
+        cd frontend
+        npm run test:ci
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./frontend/coverage/lcov.info
+        flags: frontend
+        name: frontend-coverage
