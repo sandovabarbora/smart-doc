@@ -1,0 +1,52 @@
+from pydantic_settings import BaseSettings
+from typing import Optional, List
+
+class Settings(BaseSettings):
+    PROJECT_NAME: str = "Smart Document Analyzer"
+    VERSION: str = "1.0.0"
+    API_V1_STR: str = "/api/v1"
+    
+    # Database
+    POSTGRES_SERVER: str = "localhost"
+    POSTGRES_USER: str = "postgres"
+    POSTGRES_PASSWORD: str = "password"
+    POSTGRES_DB: str = "smart_doc_analyzer"
+    DATABASE_URL: Optional[str] = None
+    
+    @property
+    def database_url(self) -> str:
+        if self.DATABASE_URL:
+            return self.DATABASE_URL
+        return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}/{self.POSTGRES_DB}"
+    
+    # LLM Configuration
+    ANTHROPIC_API_KEY: str = ""
+    DEFAULT_MODEL: str = "claude-3-sonnet-20240229"
+    
+    # Vector Store
+    CHROMA_PERSIST_DIRECTORY: str = "./chroma_db"
+    EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
+    
+    # RAG Configuration
+    CHUNK_SIZE: int = 1000
+    CHUNK_OVERLAP: int = 200
+    TOP_K_RETRIEVAL: int = 5
+    SIMILARITY_THRESHOLD: float = 0.7
+    
+    # File Upload
+    MAX_FILE_SIZE: int = 10 * 1024 * 1024
+    ALLOWED_EXTENSIONS: List[str] = ["pdf", "docx", "txt", "md"]
+    UPLOAD_DIR: str = "./uploads"
+    
+    # Security
+    SECRET_KEY: str = "your-secret-key-change-in-production"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    
+    # Evaluation
+    EVALUATION_BATCH_SIZE: int = 10
+    EVALUATION_METRICS: List[str] = ["faithfulness", "answer_relevancy", "context_precision", "context_recall"]
+    
+    class Config:
+        env_file = ".env"
+
+settings = Settings()
