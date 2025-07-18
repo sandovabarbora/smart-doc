@@ -34,7 +34,7 @@ class DocumentProcessor:
                     document_id=document.id,
                     chunk_index=i,
                     content=chunk.page_content,
-                    metadata=chunk.metadata
+                    chunk_metadata=chunk.metadata
                 )
                 db_chunks.append(db_chunk)
                 db.add(db_chunk)
@@ -145,6 +145,12 @@ class DocumentProcessor:
     def _extract_metadata(self, text: str) -> Dict[str, Any]:
         metadata = {}
         
+        # Always initialize word_count and starts_with
+        words = text.lower().split() if text else []
+        metadata['word_count'] = len(words)
+        metadata['starts_with'] = words[0] if words else ""
+        
+        # Determine content type
         if any(keyword in text.lower() for keyword in ['table', 'row', 'column', '|']):
             metadata['content_type'] = 'table'
         elif any(keyword in text.lower() for keyword in ['figure', 'chart', 'graph', 'image']):
@@ -153,11 +159,6 @@ class DocumentProcessor:
             metadata['content_type'] = 'structured'
         else:
             metadata['content_type'] = 'paragraph'
-        
-        words = text.lower().split()
-        if len(words) > 0:
-            metadata['word_count'] = len(words)
-            metadata['starts_with'] = words[0] if words else ""
         
         return metadata
     

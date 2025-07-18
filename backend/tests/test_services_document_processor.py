@@ -1,4 +1,3 @@
-# backend/tests/test_services_document_processor.py
 import pytest
 import tempfile
 import os
@@ -19,10 +18,11 @@ async def test_extract_text_file(doc_processor):
         f.write(content)
         f.flush()
         
-        result = await doc_processor._extract_content(f.name, "text/plain")
-        
-        assert result == content
-        os.unlink(f.name)
+        try:
+            result = await doc_processor._extract_content(f.name, "text/plain")
+            assert result == content
+        finally:
+            os.unlink(f.name)
 
 @pytest.mark.asyncio
 async def test_create_chunks(doc_processor):
@@ -52,3 +52,43 @@ def test_extract_metadata(doc_processor):
     
     assert metadata['content_type'] == 'table'
     assert 'word_count' in metadata
+
+def test_is_header(doc_processor):
+    """Test header detection"""
+    assert doc_processor._is_header("CHAPTER 1")
+    assert doc_processor._is_header("Introduction:")
+    assert not doc_processor._is_header("This is a regular sentence.")
+
+@pytest.mark.asyncio
+async def test_process_document_error_handling(doc_processor, db_session):
+    """Test document processing with error"""
+    doc = Document(
+        filename="nonexistent.txt",
+        original_filename="nonexistent.txt",
+        file_size=1024,
+        content_type="text/plain"
+    )
+    db_session.add(doc)
+    db_session.commit()
+    
+    with pytest.raises(Exception):
+        await doc_processor.process_document("/nonexistent/path", doc, db_session)
+    
+    # Check that error was recorded
+    assert doc.processing_error is not None
+    assert not doc.processed
+
+@pytest.mark.asyncio
+async def test_cleanup_temp_file(doc_processor):
+    """Test temp file cleanup"""
+    with tempfile.NamedTemporaryFile(delete=False) as f:
+        temp_path = f.name
+    
+    # File should exist
+    assert os.path.exists(temp_path)
+    
+    # Cleanup should remove it
+    await doc_processor.cleanup_temp_file(temp_path)
+    
+    # File should not exist
+    assert not os.path.exists(temp_path)

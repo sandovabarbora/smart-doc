@@ -46,3 +46,7 @@ build-backend = "hatchling.build"
 # Oprava pro hatchling - říkáme mu kde najít náš kód
 [tool.hatch.build.targets.wheel]
 packages = ["app"]
+
+[project.optional-dependencies.eval]
+datasets = ">=2.14.0"
+ragas = ">=0.1.0"

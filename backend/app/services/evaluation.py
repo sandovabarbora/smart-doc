@@ -7,9 +7,6 @@ import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 
 import anthropic
-from datasets import Dataset
-from ragas import evaluate
-from ragas.metrics import faithfulness, answer_relevancy, context_precision, context_recall
 
 from .rag_engine import RAGEngine, RAGResponse
 from ..models.evaluation import Evaluation, EvaluationBatch
@@ -46,48 +43,8 @@ class EvaluationService:
     ) -> EvaluationResult:
         rag_response = await self.rag_engine.query(question)
         
-        evaluation_data = {
-            "question": [question],
-            "answer": [rag_response.answer],
-            "contexts": [rag_response.context_used],
-            "ground_truth": [ground_truth] if ground_truth else [rag_response.answer]
-        }
-        
-        dataset = Dataset.from_dict(evaluation_data)
-        
-        try:
-            ragas_result = await asyncio.get_event_loop().run_in_executor(
-                self.executor,
-                self._run_ragas_evaluation,
-                dataset
-            )
-            
-            metrics = ragas_result.to_pandas().iloc[0]
-            
-            return EvaluationResult(
-                question=question,
-                answer=rag_response.answer,
-                retrieved_context=rag_response.context_used,
-                ground_truth=ground_truth,
-                faithfulness_score=float(metrics.get('faithfulness', 0.0)),
-                answer_relevancy_score=float(metrics.get('answer_relevancy', 0.0)),
-                context_precision_score=float(metrics.get('context_precision', 0.0)),
-                context_recall_score=float(metrics.get('context_recall', 0.0)) if ground_truth else 0.0,
-                retrieval_time=rag_response.retrieval_time,
-                generation_time=rag_response.generation_time,
-                total_time=rag_response.total_time
-            )
-            
-        except Exception as e:
-            return await self._custom_evaluation(question, rag_response, ground_truth)
-    
-    def _run_ragas_evaluation(self, dataset: Dataset):
-        metrics_to_use = [faithfulness, answer_relevancy, context_precision]
-        
-        if dataset['ground_truth'][0] and dataset['ground_truth'][0] != dataset['answer'][0]:
-            metrics_to_use.append(context_recall)
-            
-        return evaluate(dataset, metrics=metrics_to_use)
+        # Use custom evaluation instead of RAGAS
+        return await self._custom_evaluation(question, rag_response, ground_truth)
     
     async def _custom_evaluation(
         self, 
@@ -299,10 +256,11 @@ Provide only the numeric score (e.g., 0.8):"""
                 db.add(evaluation)
         
         if valid_results:
-            batch.avg_faithfulness = np.mean([r.faithfulness_score for r in valid_results])
-            batch.avg_answer_relevancy = np.mean([r.answer_relevancy_score for r in valid_results])
-            batch.avg_context_precision = np.mean([r.context_precision_score for r in valid_results])
-            batch.avg_context_recall = np.mean([r.context_recall_score for r in valid_results if r.context_recall_score > 0])
+            batch.avg_faithfulness = float(np.mean([r.faithfulness_score for r in valid_results]))
+            batch.avg_answer_relevancy = float(np.mean([r.answer_relevancy_score for r in valid_results]))
+            batch.avg_context_precision = float(np.mean([r.context_precision_score for r in valid_results]))
+            recall_scores = [r.context_recall_score for r in valid_results if r.context_recall_score > 0]
+            batch.avg_context_recall = float(np.mean(recall_scores)) if recall_scores else 0.0
             batch.total_evaluations = len(valid_results)
         
         db.commit()
@@ -314,6 +272,11 @@ Provide only the numeric score (e.g., 0.8):"""
             raise ValueError(f"Evaluation batch {batch_id} not found")
         
         evaluations = db.query(Evaluation).filter(Evaluation.created_at >= batch.created_at).all()
+        
+        # Handle empty lists for numpy.mean
+        retrieval_times = [e.retrieval_time for e in evaluations if e.retrieval_time is not None]
+        generation_times = [e.generation_time for e in evaluations if e.generation_time is not None]
+        total_times = [e.total_time for e in evaluations if e.total_time is not None]
         
         report = {
             "batch_info": {
@@ -331,9 +294,9 @@ Provide only the numeric score (e.g., 0.8):"""
                 "total_evaluations": batch.total_evaluations
             },
             "performance_metrics": {
-                "avg_retrieval_time": np.mean([e.retrieval_time for e in evaluations if e.retrieval_time]),
-                "avg_generation_time": np.mean([e.generation_time for e in evaluations if e.generation_time]),
-                "avg_total_time": np.mean([e.total_time for e in evaluations if e.total_time])
+                "avg_retrieval_time": float(np.mean(retrieval_times)) if retrieval_times else 0.0,
+                "avg_generation_time": float(np.mean(generation_times)) if generation_times else 0.0,
+                "avg_total_time": float(np.mean(total_times)) if total_times else 0.0
             },
             "detailed_results": [
                 {

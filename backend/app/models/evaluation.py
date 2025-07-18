@@ -23,8 +23,6 @@ class Evaluation(Base):
     total_time = Column(Float, nullable=True)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
-    document = relationship("Document", back_populates="evaluations")
 
 class EvaluationBatch(Base):
     __tablename__ = "evaluation_batches"

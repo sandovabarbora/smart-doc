@@ -19,7 +19,7 @@ def test_upload_document_success(client, temp_upload_dir, db_session):
     assert data["filename"] == "test.txt"
     assert data["status"] == "processed"
 
-def test_upload_document_invalid_type(client):
+def test_upload_document_invalid_type(client, db_session):
     """Test upload with invalid file type"""
     file_content = b"Invalid content"
     
@@ -31,7 +31,7 @@ def test_upload_document_invalid_type(client):
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert "File type not supported" in response.json()["detail"]
 
-def test_upload_document_too_large(client):
+def test_upload_document_too_large(client, db_session):
     """Test upload with file too large"""
     large_content = b"x" * (settings.MAX_FILE_SIZE + 1)
     
@@ -45,10 +45,6 @@ def test_upload_document_too_large(client):
 
 def test_list_documents_empty(client, db_session):
     """Test listing documents when none exist"""
-    # Clean database first
-    db_session.query(Document).delete()
-    db_session.commit()
-    
     response = client.get("/api/v1/documents/")
     
     assert response.status_code == status.HTTP_200_OK
@@ -56,10 +52,6 @@ def test_list_documents_empty(client, db_session):
 
 def test_list_documents_with_data(client, db_session):
     """Test listing documents with existing data"""
-    # Clean database first
-    db_session.query(Document).delete()
-    db_session.commit()
-    
     # Create test document
     doc = Document(
         filename="test_doc.pdf",
@@ -81,10 +73,6 @@ def test_list_documents_with_data(client, db_session):
 
 def test_delete_document_success(client, db_session):
     """Test successful document deletion"""
-    # Clean database first
-    db_session.query(Document).delete()
-    db_session.commit()
-    
     doc = Document(
         filename="to_delete.pdf",
         original_filename="to_delete.pdf", 
@@ -100,7 +88,7 @@ def test_delete_document_success(client, db_session):
     assert response.status_code == status.HTTP_200_OK
     assert "deleted successfully" in response.json()["message"]
 
-def test_delete_document_not_found(client):
+def test_delete_document_not_found(client, db_session):
     """Test deleting non-existent document"""
     response = client.delete("/api/v1/documents/999")
     

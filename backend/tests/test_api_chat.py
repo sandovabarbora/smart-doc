@@ -3,13 +3,8 @@ from unittest.mock import patch, AsyncMock
 from fastapi import status
 from app.models.document import ChatSession, ChatMessage
 
-def test_chat_new_session(client, mock_anthropic, mock_vector_store, db_session):
+def test_chat_new_session(client, db_session, mock_anthropic, mock_vector_store):
     """Test creating new chat session"""
-    # Clean database first
-    db_session.query(ChatSession).delete()
-    db_session.query(ChatMessage).delete()
-    db_session.commit()
-    
     with patch('app.services.chat_service.ChatService.process_message') as mock_process:
         mock_process.return_value = {
             "answer": "Test response",
@@ -32,11 +27,6 @@ def test_chat_new_session(client, mock_anthropic, mock_vector_store, db_session)
 
 def test_chat_existing_session(client, db_session, mock_anthropic, mock_vector_store):
     """Test sending message to existing session"""
-    # Clean database first
-    db_session.query(ChatSession).delete()
-    db_session.query(ChatMessage).delete()
-    db_session.commit()
-    
     # Create test session
     session = ChatSession(session_id="test-session-123")
     db_session.add(session)
@@ -65,12 +55,8 @@ def test_chat_existing_session(client, db_session, mock_anthropic, mock_vector_s
         assert data["session_id"] == "test-session-123"
         assert len(data["sources"]) > 0
 
-def test_chat_invalid_session(client, mock_anthropic, mock_vector_store, db_session):
+def test_chat_invalid_session(client, db_session, mock_anthropic, mock_vector_store):
     """Test using invalid session ID"""
-    # Clean database first
-    db_session.query(ChatSession).delete()
-    db_session.commit()
-    
     response = client.post(
         "/api/v1/chat/",
         json={
@@ -84,10 +70,6 @@ def test_chat_invalid_session(client, mock_anthropic, mock_vector_store, db_sess
 
 def test_list_sessions_empty(client, db_session):
     """Test listing sessions when none exist"""
-    # Clean database first
-    db_session.query(ChatSession).delete()
-    db_session.commit()
-    
     response = client.get("/api/v1/chat/sessions")
     
     assert response.status_code == status.HTTP_200_OK
@@ -95,10 +77,6 @@ def test_list_sessions_empty(client, db_session):
 
 def test_list_sessions_with_data(client, db_session):
     """Test listing sessions with data"""
-    # Clean database first
-    db_session.query(ChatSession).delete()
-    db_session.commit()
-    
     session = ChatSession(session_id="test-session")
     db_session.add(session)
     db_session.commit()
@@ -112,11 +90,6 @@ def test_list_sessions_with_data(client, db_session):
 
 def test_get_session_messages(client, db_session):
     """Test getting messages for a session"""
-    # Clean database first
-    db_session.query(ChatSession).delete()
-    db_session.query(ChatMessage).delete()
-    db_session.commit()
-    
     session = ChatSession(session_id="test-session")
     db_session.add(session)
     db_session.flush()
@@ -139,10 +112,6 @@ def test_get_session_messages(client, db_session):
 
 def test_delete_session(client, db_session):
     """Test deleting a chat session"""
-    # Clean database first
-    db_session.query(ChatSession).delete()
-    db_session.commit()
-    
     session = ChatSession(session_id="to-delete")
     db_session.add(session)
     db_session.commit()
